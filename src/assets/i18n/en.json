@@ -1,0 +1,114 @@
+{
+  "MYINTEREST": {
+    "TemporralView": {
+      "componentNotAvailable": "Component not available, Component in development stage",
+      "componentNotAvailableSubtitle": "This component is not available, it is under development"
+    },
+    "Unauthorized": {
+      "applicationNotAvailable": "This application is not currently available in your company",
+      "contactSupport": "Please contact your support team"
+    },
+    "admin": {
+      "components": {
+        "contentCreatorAdmin": {
+          "title": "Content Creator Detail",
+          "selectUser": "First you will need to select the user that you wish to make a Content Creator for My Interests.",
+          "username": "User Name",
+          "finduserplaceholder": "Find a user by name",
+          "searchuser": "Search User",
+          "searchresult": "Search Results",
+          "results": "Your search results will appear here.",
+          "selectGlobal": "Here you can select the Global Business Objects that",
+          "chooseaudience": " will be able to choose from as an audience to publish content to.",
+          "selecteduser": "Selected User",
+          "userpermissions": "The user has permissions for { companies } companies.",
+          "leatonecompany": "User must have at least one company",
+          "companiesupdated": "User companies updated successfully"
+        },
+        "newsContentCreatorDelete": {
+          "title": "Remove Content Creator",
+          "softwarebeta": "This software is currently in beta. While being feature complete, you may experience some issues that decrease the reliability of the application.",
+          "inconsistent": "Inconsistent Results",
+          "featuresCases": "The features and functionality of this application have been built to specific use cases. Often, when a product is released, we find edge cases that may not have been considered during our initial development. During this phase, we work to capture all of these edge cases to ensure the functionality provided works under all circumstances.",
+          "unhandlederrors": "Unhandled Errors",
+          "readingwriting": "In most cases, reading or writing data actually involves a chain of events that have to all work successfully in order to complete a task. While we strive to handle all possible failures along that chain, sometimes there is a break where we don’t expect it. This may result in a spinner that never stops spinning or a button click that leaves you hanging. During this phase, we work to track down all these breaks so that we can handle them appropriately.",
+          "speedissues": "Speed or Performance Issues",
+          "duringinitial": "During initial development, our focus is on getting things working. During this phase, we will be reviewing usage and exploring options to create efficiencies that speed up your experience.",
+          "enhancements": "Design Enhancements",
+          "bestexperience": "We strive to provide the best possible experience. This is a continually evolving process where refinements are made as we learn more about how our users interact with our software. During this phase, we work to quickly incorporate what we learn to enhance the user experience.",
+          "cancel": "Cancel",
+          "removeuser": "Remove User"
+        },
+        "error": {
+          "listingusers": "Error listing users, ",
+          "tryagain": "try again.",
+          "ups": "Ups! An error has ocurred."
+        }
+      },
+      "views": {
+        "NewsAdmin": {
+          "title": "My Interests",
+          "administration": "Administration",
+          "admindescmanage": "From here you can manage the audience that a Content Creator is able to publish to from within Contentful.",
+          "admindescglobal": "The Global Business Objects that you associate with a user here will be made available to that user within the Contentful publishing platform.",
+          "usersnotlisted": "Users that are not listed below will not be able to create any content within Contentful.",
+          "addcontentcreator": "Add Content Creator",
+          "contentcreator": "Content Creator",
+          "view": "View",
+          "remove": "Remove"
+        }
+      }
+    },
+    "calendar": {
+      "components": {
+        "EventDetails": {
+          "start": "Start:",
+          "exportevent": "Export Event"
+        }
+      }
+    },
+    "news": {
+      "components": {
+        "NewsList": {
+          "categories": "Categories",
+          "cancel": "Cancel",
+          "save": "Save",
+          "newestfirst": "Publish Date - Newest First",
+          "oldestfirst": "Publish Date - Oldest First",
+          "updatenewestfirst": "Updated Date - Newest First",
+          "updateoldestfirst": "Updated Date - Oldest First",
+          "noitemsfound": "No items found",
+          "nomoreitems": "No more items to show",
+          "loading": "Loading..."
+        }
+      }
+    },
+    "notifications": {
+      "views": {
+        "notifications": {
+          "noNotifications": "You currently have no notifications"
+        }
+      }
+    },
+    "sentiments": {
+      "views": {
+        "sentiments": {
+          "thanksforsharing": "Thanks for sharing your feelings today, please come back to share your feelings tomorrow again.",
+          "howareyou": "How are you feeling today?",
+          "tellusmainreason": "Could you tell us the main reason why?",
+          "contactfeedback": "We may contact you based on your feedback.",
+          "pleasedetail": "Please detail more (max 3)",
+          "typecomments": "Type here your comments",
+          "havequestion": "I have a question, I request a contact",
+          "alreadyopencase": "You already have an open case pending to resolve",
+          "submit": "Submit",
+          "thankyoulettingus": "Thank you for letting us know how you feel.",
+          "newcasenumber": "A new case number was created:",
+          "callHR": "If this is urgent, please call HR at <b class='caseNumber'>{ phoneNumber }</b> and you can speak to an HR representativ right away.",
+          "urgentcontact": "If this is an urgent matter, please contact your local HR Team.",
+          "close": "Close"
+        }
+      }
+    }
+  }
+}

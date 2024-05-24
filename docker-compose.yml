@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  webserver:
+    image: tpfrontend.azurecr.io/raf-front/stage:latest
+    container_name: raf-frontend
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "8080:80"
+    networks:
+      - app-network
+
+
+networks:
+  app-network:
+    driver: bridge

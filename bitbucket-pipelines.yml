@@ -1,0 +1,358 @@
+image: atlassian/default-image:3
+
+definitions:
+  services:
+    docker:
+      memory: 2048
+  steps:
+    - step: &redeploy-k8s
+        name: "Re-Deploy Docker Image in DEVELOPMENT k8s"
+        image: mcr.microsoft.com/azure-cli:latest
+        script:
+          # install kubernetes
+          - az aks install-cli
+          # login as the service principal that has access to the enterprise devel k8s cluster
+          - az login --service-principal --username $AZURE_DEV_SERVICE_PRINCIPAL_APP_ID --password $AZURE_DEV_SERVICE_PRINCIPAL_PASSWORD --tenant $AZURE_TENANT_ID
+          # get access credentials for the enterprise kubernetes cluster
+          - az aks get-credentials --resource-group FrontEnd --name tpg-es-dev-01 --file .kube/kubeconfig-FrontEnd-tpg-es-dev-01 --overwrite-existing
+          # specifically export the KUBECONFIG file, just to be explicit about it
+          - export KUBECONFIG=.kube/kubeconfig-FrontEnd-tpg-es-dev-01
+          # use the following so that we have a non-interactive login
+          # more info: https://github.com/Azure/kubelogin#service-principal-login-flow-non-interactive
+          - kubelogin convert-kubeconfig -l spn
+          - export AAD_SERVICE_PRINCIPAL_CLIENT_ID=$AZURE_DEV_SERVICE_PRINCIPAL_APP_ID
+          - export AAD_SERVICE_PRINCIPAL_CLIENT_SECRET=$AZURE_DEV_SERVICE_PRINCIPAL_PASSWORD
+          # ensure we are in the devel context
+          - kubectl config use-context tpg-es-dev-01
+          # restart the deployment
+          - kubectl rollout restart $DEPLOYMENT_NAME
+    - step: &production-redeploy-k8s
+        name: "Re-Deploy Docker Image in PRODUCTION k8s"
+        image: mcr.microsoft.com/azure-cli:latest
+        script:
+          # install kubernetes
+          - az aks install-cli
+          # login as the service principal that has access to the enterprise production k8s cluster
+          - az login --service-principal --username $AZURE_PROD_SERVICE_PRINCIPAL_APP_ID --password $AZURE_PROD_SERVICE_PRINCIPAL_PASSWORD --tenant $AZURE_TENANT_ID
+          # get access credentials for the enterprise kubernetes cluster
+          - az aks get-credentials --resource-group ES-Shared-Deployment --name tpg-es-k8-01 --file .kube/kubeconfig-Shared-tpg-es-k8-01 --overwrite-existing
+          # specifically export the KUBECONFIG file, just to be explicit about it
+          - export KUBECONFIG=.kube/kubeconfig-Shared-tpg-es-k8-01
+          # use the following so that we have a non-interactive login
+          # more info: https://github.com/Azure/kubelogin#service-principal-login-flow-non-interactive
+          - kubelogin convert-kubeconfig -l spn
+          - export AAD_SERVICE_PRINCIPAL_CLIENT_ID=$AZURE_PROD_SERVICE_PRINCIPAL_APP_ID
+          - export AAD_SERVICE_PRINCIPAL_CLIENT_SECRET=$AZURE_PROD_SERVICE_PRINCIPAL_PASSWORD
+          # ensure we are in the production context
+          - kubectl config use-context tpg-es-k8-01
+          # restart the deployment
+          - kubectl rollout restart $DEPLOYMENT_NAME
+
+pipelines:
+  branches:
+    # 
+    # DEV
+    # 
+    master:
+      - step:
+          name: "DEVELOPMENT Build & Push"
+          services:
+            - docker
+          script:
+            - echo $DOTENV_DEV | base64 -d > .env
+            - echo -e "\n" >> .env;
+            - cat .env
+            - node -v
+            - npm -v            
+            - npm i
+            - npm run build
+            - docker login tpfrontend.azurecr.io -u $ACR_DEV_USERNAME -p $ACR_DEV_PASSWORD
+            - docker build -t tpfrontend.azurecr.io/myinterests/ui/dev:latest .
+            - docker push tpfrontend.azurecr.io/myinterests/ui/dev:latest
+      - step:
+          <<: *redeploy-k8s
+          deployment: development
+          name: "DEVELOPMENT Deployment in DEVELOPMENT K8S"
+  custom:
+    # 
+    # DEV
+    # 
+    deploy-to-dev:
+      - step:
+          name: "DEVELOPMENT Build & Push"
+          services:
+            - docker
+          script:
+            - echo $DOTENV_DEV | base64 -d > .env
+            - echo -e "\n" >> .env;
+            - node -v
+            - npm -v
+            - npm i
+            - npm run build
+            - docker login tpfrontend.azurecr.io -u $ACR_DEV_USERNAME -p $ACR_DEV_PASSWORD
+            - docker build -t tpfrontend.azurecr.io/myinterests/ui/dev:latest .
+            - docker push tpfrontend.azurecr.io/myinterests/ui/dev:latest
+      - step:
+          <<: *redeploy-k8s
+          deployment: development
+          name: "DEVELOPMENT Deployment in DEVELOPMENT K8S"
+    # 
+    # STAGE
+    # 
+    deploy-to-stage:
+      - step:
+          name: "Test this is a Release Branch"
+          script:
+            - BRANCH=$(git branch --show-current)
+            - echo $BRANCH
+            - if [[ $BRANCH != "release/"* ]]; then echo "You can only deploy release branches" && exit 1; fi
+      - step:
+          name: "STAGE Build & Push"
+          services:
+            - docker
+          script:
+            - VERSION=$(git branch --show-current | cut -d'/' -f2)
+            - echo $VERSION
+            - echo $DOTENV_STAGE | base64 -d > .env
+            - echo -e "\n" >> .env;
+            - npm i
+            - npm run build
+            - docker login tpfrontend.azurecr.io -u $ACR_DEV_USERNAME -p $ACR_DEV_PASSWORD
+            - docker build -t tpfrontend.azurecr.io/myinterests/ui/stage:$VERSION .
+            - docker push tpfrontend.azurecr.io/myinterests/ui/stage:$VERSION
+            - docker build -t tpfrontend.azurecr.io/myinterests/ui/stage:latest .
+            - docker push tpfrontend.azurecr.io/myinterests/ui/stage:latest
+      - step:
+          <<: *redeploy-k8s
+          deployment: stage
+          name: "STAGE Deployment in DEVELOPMENT K8S"
+    # 
+    # DEMO
+    # 
+    deploy-to-demo:
+      - step:
+          name: "Test this is a Release Branch"
+          script:
+            - BRANCH=$(git branch --show-current)
+            - echo $BRANCH
+            - if [[ $BRANCH != "release/"* ]]; then echo "You can only deploy release branches" && exit 1; fi
+      - step:
+          name: "DEMO Build & Push"
+          services:
+            - docker
+          script:
+            - VERSION=$(git branch --show-current | cut -d'/' -f2)
+            - echo $VERSION
+            - echo $DOTENV_DEMO | base64 -d > .env
+            - echo -e "\n" >> .env;
+            - npm i
+            - npm run build
+            - docker login tpfrontend.azurecr.io -u $ACR_DEV_USERNAME -p $ACR_DEV_PASSWORD
+            - docker build -t tpfrontend.azurecr.io/myinterests/ui/demo:$VERSION .
+            - docker push tpfrontend.azurecr.io/myinterests/ui/demo:$VERSION
+            - docker build -t tpfrontend.azurecr.io/myinterests/ui/demo:latest .
+            - docker push tpfrontend.azurecr.io/myinterests/ui/demo:latest
+      - step:
+          <<: *redeploy-k8s
+          deployment: demo
+          name: "DEMO Deployment in DEVELOPMENT K8S"
+    # 
+    # TPCAST
+    # 
+    deploy-to-tpcast:
+      - step:
+          name: "Test this is a Release Branch"
+          script:
+            - BRANCH=$(git branch --show-current)
+            - echo $BRANCH
+            - if [[ $BRANCH != "release/"* ]]; then echo "You can only deploy release branches" && exit 1; fi
+      - step:
+          name: "TPCAST Build & Push"
+          services:
+            - docker
+          script:
+            - VERSION=$(git branch --show-current | cut -d'/' -f2)
+            - echo $VERSION
+            - echo $DOTENV_TPCAST | base64 -d > .env
+            - echo -e "\n" >> .env;
+            - npm i
+            - npm run build
+            - docker login tpfrontend.azurecr.io -u $ACR_DEV_USERNAME -p $ACR_DEV_PASSWORD
+            - docker build -t tpfrontend.azurecr.io/myinterests/ui/tpcast:$VERSION .
+            - docker push tpfrontend.azurecr.io/myinterests/ui/tpcast:$VERSION
+            - docker build -t tpfrontend.azurecr.io/myinterests/ui/tpcast:latest .
+            - docker push tpfrontend.azurecr.io/myinterests/ui/tpcast:latest
+      - step:
+          <<: *redeploy-k8s
+          deployment: tpcast
+          name: "TPCast Deployment in DEVELOPMENT K8S"
+    # 
+    # HOTFIX
+    # 
+    deploy-to-hotfix:
+      - step:
+          name: "Test this is a Release Branch"
+          script:
+            - BRANCH=$(git branch --show-current)
+            - echo $BRANCH
+            - if [[ $BRANCH != "release/"* ]]; then echo "You can only deploy release branches" && exit 1; fi
+      - step:
+          name: "HOTFIX Build & Push"
+          services:
+            - docker
+          script:
+            - VERSION=$(git branch --show-current | cut -d'/' -f2)
+            - echo $VERSION
+            - echo $DOTENV_HOTFIX | base64 -d > .env
+            - echo -e "\n" >> .env;
+            - npm i
+            - npm run build
+            - docker login tpfrontend.azurecr.io -u $ACR_DEV_USERNAME -p $ACR_DEV_PASSWORD
+            - docker build -t tpfrontend.azurecr.io/myinterests/ui/hotfix:$VERSION .
+            - docker push tpfrontend.azurecr.io/myinterests/ui/hotfix:$VERSION
+            - docker build -t tpfrontend.azurecr.io/myinterests/ui/hotfix:latest .
+            - docker push tpfrontend.azurecr.io/myinterests/ui/hotfix:latest
+      - step:
+          <<: *redeploy-k8s
+          deployment: hotfix
+          name: "HOTFIX Deployment in DEVELOPMENT K8S"
+    # 
+    # PRODUCTION
+    # 
+    # Version Push
+    # 
+    push-release-version-to-production:
+      - step:
+          name: "Test this is a Release Branch"
+          script:
+            - BRANCH=$(git branch --show-current)
+            - echo $BRANCH
+            - if [[ $BRANCH != "release/"* ]]; then echo "You can only deploy release branches" && exit 1; fi
+      - step:
+          name: "PRODUCTION Build & Push"
+          services:
+            - docker
+          script:
+            - VERSION=$(git branch --show-current | cut -d'/' -f2)
+            - echo $VERSION
+            - echo $DOTENV_PRODUCTION | base64 -d > .env
+            - echo -e "\n" >> .env;
+            - npm i
+            - npm run build
+            - docker login tpges.azurecr.io -u $ACR_PROD_USERNAME -p $ACR_PROD_PASSWORD 
+            - docker build -t tpges.azurecr.io/myinterests/frontend:$VERSION .
+            - docker push tpges.azurecr.io/myinterests/frontend:$VERSION
+    # 
+    # PRODUCTION
+    # 
+    # Deploy
+    # 
+    deploy-to-production:
+      - step:
+          name: "Test this is a Release Branch"
+          script:
+            - BRANCH=$(git branch --show-current)
+            - echo $BRANCH
+            - if [[ $BRANCH != "release/"* ]]; then echo "You can only deploy release branches" && exit 1; fi
+      - step:
+          name: "PRODUCTION Build & Push"
+          services:
+            - docker
+          script:
+            - VERSION=$(git branch --show-current | cut -d'/' -f2)
+            - echo $VERSION
+            - echo $DOTENV_PRODUCTION | base64 -d > .env
+            - echo -e "\n" >> .env;
+            - npm i
+            - npm run build
+            - docker login tpges.azurecr.io -u $ACR_PROD_USERNAME -p $ACR_PROD_PASSWORD 
+            - docker build -t tpges.azurecr.io/myinterests/ui:$VERSION .
+            - docker push tpges.azurecr.io/myinterests/ui:$VERSION
+            - docker build -t tpges.azurecr.io/myinterests/ui:latest .
+            - docker push tpges.azurecr.io/myinterests/ui:latest
+      - step:
+          <<: *production-redeploy-k8s
+          deployment: production
+          name: "PRODUCTION Deployment in PRODUCTION K8S"
+    # 
+    # PRE-PRODUCTION
+    # 
+    # Deploy
+    # 
+    deploy-production-to-development:
+      - step:
+          name: "Test this is a Release Branch"
+          script:
+            - BRANCH=$(git branch --show-current)
+            - echo $BRANCH
+            - if [[ $BRANCH != "release/"* ]]; then echo "You can only deploy release branches" && exit 1; fi
+      - step:
+          name: "PRODUCTION Build & Push"
+          services:
+            - docker
+          script:
+            - VERSION=$(git branch --show-current | cut -d'/' -f2)
+            - echo $VERSION
+            - echo $DOTENV_PREPROD | base64 -d > .env
+            - echo -e "\n" >> .env;
+            - npm i
+            - npm run build
+            - docker login tpfrontend.azurecr.io -u $ACR_DEV_USERNAME -p $ACR_DEV_PASSWORD
+            - docker build -t tpfrontend.azurecr.io/myinterests/ui:latest .
+            - docker push tpfrontend.azurecr.io/myinterests/ui:latest
+      - step:
+          <<: *redeploy-k8s
+          deployment: development
+          name: "PRE-PRODUCTION Deployment in Development K8S"          
+    # 
+    # PRODUCTION & DEMO
+    # 
+    # Deploy
+    # 
+    deploy-to-production-demo:
+      - step:
+          name: "Test this is a Release Branch"
+          script:
+            - BRANCH=$(git branch --show-current)
+            - echo $BRANCH
+            - if [[ $BRANCH != "release/"* ]]; then echo "You can only deploy release branches" && exit 1; fi
+      - step:
+          name: "DEMO Build & Push"
+          services:
+            - docker
+          script:
+            - VERSION=$(git branch --show-current | cut -d'/' -f2)
+            - echo $VERSION
+            - echo $DOTENV_DEMO | base64 -d > .env
+            - echo -e "\n" >> .env;
+            - npm i
+            - npm run build
+            - docker login tpfrontend.azurecr.io -u $ACR_DEV_USERNAME -p $ACR_DEV_PASSWORD
+            - docker build -t tpfrontend.azurecr.io/myinterests/ui/demo:$VERSION .
+            - docker push tpfrontend.azurecr.io/myinterests/ui/demo:$VERSION
+            - docker build -t tpfrontend.azurecr.io/myinterests/ui/demo:latest .
+            - docker push tpfrontend.azurecr.io/myinterests/ui/demo:latest
+      - step:
+          <<: *redeploy-k8s
+          deployment: demo
+          name: "DEMO Deployment in DEVELOPMENT K8S"
+      - step:
+          name: "PRODUCTION Build & Push"
+          services:
+            - docker
+          script:
+            - VERSION=$(git branch --show-current | cut -d'/' -f2)
+            - echo $VERSION
+            - echo $DOTENV_PRODUCTION | base64 -d > .env
+            - echo -e "\n" >> .env;
+            - npm i
+            - npm run build
+            - docker login -u $ACR_PROD_USERNAME -p $ACR_PROD_PASSWORD tpges.azurecr.io
+            - docker build -t tpges.azurecr.io/myinterests/frontend:$VERSION .
+            - docker push tpges.azurecr.io/myinterests/frontend:$VERSION
+            - docker build -t tpges.azurecr.io/myinterests/frontend:latest .
+            - docker push tpges.azurecr.io/myinterests/frontend:latest
+      - step:
+          <<: *production-redeploy-k8s
+          deployment: production
+          name: "PRODUCTION Deployment in PRODUCTION K8S"
